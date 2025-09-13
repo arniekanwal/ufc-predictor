@@ -1,7 +1,8 @@
 from typing import List, Optional
+from collections import defaultdict
 from datetime import datetime
 
-from sqlalchemy import create_engine, MetaData, Table
+from sqlalchemy import create_engine, insert
 from sqlalchemy import String, DateTime, Float, Integer, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.orm import Session, sessionmaker
@@ -20,7 +21,7 @@ class Fighter(Base):
     # One-to-Many relationship to weightclasses
     weight_classes: Mapped[list["WeightClass"]] = relationship(back_populates="fighter", cascade="all, delete-orphan")
 
-    # date = mapped_column(DateTime)
+    date = mapped_column(DateTime)
     gender: Mapped[str] = mapped_column(String(6))
     expectedvalue: Mapped[float] = mapped_column(Float)
     currentlosestreak: Mapped[int] = mapped_column(Integer)
@@ -87,55 +88,52 @@ def split_fights(df: pd.DataFrame) -> pd.DataFrame:
 
     rfighter = df[shared + red].rename(columns=renameTo)
     bfighter = df[shared + blue].rename(columns=renameTo)
-    return pd.concat([rfighter, bfighter])
+    return pd.concat([rfighter, bfighter]).reset_index(drop=True)
 
-def populate_database_bulk(df, weight_class_dict, engine):
+def populate_db_bulk(stats_dict, wc_dict, engine):
     """
-    More efficient bulk insertion method for large datasets
+    Efficient bulk insertion method for UFC dataset
     """
     Session = sessionmaker(bind=engine)
     
     with Session() as session:
         fighter_data = []
-        for _, row in df.iterrows():
-            row_dict = row.to_dict()
-            fighter_data.append(row_dict)
+
+        for stats in stats_dict.values():
+            fighter_data.append(stats)
         
         # Bulk insert the fighter data
-        session.bulk_insert_mappings(Fighter, fighter_data)
+        session.execute(insert(Fighter), fighter_data)
         session.flush()
         
         # Query back the fighters to get their IDs for weight class insertion
         weight_class_data = []
-        for fighter_name, weight_classes_str in weight_class_dict.items():
+        for fighter_name, weight_classes in wc_dict.items():
             # Find the fighter in the database to get their ID
             fighter = session.query(Fighter).filter(Fighter.fighter == fighter_name).first()
             if not fighter:
                 continue
 
-            weight_classes_list = [wc.strip() for wc in weight_classes_str.split(',')]
-            for weight_class in weight_classes_list:
-                if weight_class:
-                    weight_class_data.append({
-                        'fighter_id': fighter.id,
-                        'weightclass': weight_class
-                    })
+            for wc in weight_classes:
+                weight_class_data.append({
+                    'fighter_id': fighter.id,
+                    'weightclass': wc
+                })
         
         # Bulk insert weight classes
         if weight_class_data:
-            session.bulk_insert_mappings(WeightClass, weight_class_data)
+            session.execute(insert(WeightClass), weight_class_data)
         
         session.commit()
         print(f"Bulk inserted {len(fighter_data)} fighters and {len(weight_class_data)} weight class records")
         
-# Query functions to answer your questions
+
 def get_fighter_weight_classes(session, fighter_name):
     """
     Query: Get all weight classes a fighter has fought at
     """
     fighter = session.query(Fighter).filter(Fighter.fighter_name == fighter_name).first()
     if fighter:
-        # Access weight classes through the relationship
         weight_classes = [wc.weight_class for wc in fighter.weight_classes]
         return weight_classes
     return []
@@ -157,22 +155,40 @@ def main():
     df = pd.read_csv('../datasets/ufc-clean.csv')
     df = split_fights(df)
 
-    # Get all weight classes fought
-    wc = df.groupby('fighter').agg(
-        classes=('weightclass', lambda x: ', '.join(x.dropna().unique())) # comma separated string
-    ).to_dict()
-    classes = wc['classes']
+    # Convert date column to datetime
+    if df['date'].dtype == 'object':
+        df['date'] = pd.to_datetime(df['date'])
 
-    last_fight = df.groupby('fighter')['date'].idxmax()
-    latest_stats_df = df.loc[last_fight]
+    # Iterate through dataframe and collect latest fight data
+    latest_fights = {}
+    wc_unique = defaultdict(set)
+
+    for _, row in df.iterrows():
+        name = row['fighter']
+        fight_date = row['date']
+        weight_class = row['weightclass']  
+        
+        if pd.notna(weight_class):
+            wc_unique[name].add(weight_class)
+        
+        if name not in latest_fights:
+            # First time seeing this fighter
+            latest_fights[name] = row.to_dict()
+        else:
+            # Compare dates to see if this fight is more recent
+            curr_date = latest_fights[name]['date']
+            if fight_date > curr_date:
+                latest_fights[name] = row.to_dict()
+
+    wc_dict = {fighter : list(classes) for fighter, classes in wc_unique.items()}
     
     # Initiate session and create schema
     DATABASE_URL = 'sqlite:///../ufc.db'
     engine = create_engine(DATABASE_URL)
     Base.metadata.create_all(engine)
 
-    # Popualate Database
-    populate_database_bulk(latest_stats_df, classes, engine)
+    # Populate Database
+    populate_db_bulk(latest_fights, wc_dict, engine)
 
 if __name__ == "__main__":
     main()
