@@ -204,3 +204,6 @@ __marimo__/
 
 # macOS additional files
 .DS_Store
+
+# SQL stuff
+*.db
