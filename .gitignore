@@ -207,3 +207,6 @@ __marimo__/
 
 # SQL stuff
 *.db
+
+# Universal Binary JSON (used by XGBoost model_save)
+*.ubj 
