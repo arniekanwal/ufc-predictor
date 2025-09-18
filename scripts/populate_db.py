@@ -1,70 +1,14 @@
 from typing import List, Optional
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
-from sqlalchemy import create_engine, insert
-from sqlalchemy import String, DateTime, Float, Integer, ForeignKey
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
+
+from libsql.db import SessionLocal, Base, engine
+from libsql import crud
 
 import pandas as pd
-
-class Base(DeclarativeBase):
-    pass
-
-class Fighter(Base):
-    __tablename__ = "fighters"
-    
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    fighter: Mapped[str] = mapped_column(String(35), nullable=False)
-    
-    # One-to-Many relationship to weightclasses
-    weight_classes: Mapped[list["WeightClass"]] = relationship(back_populates="fighter", cascade="all, delete-orphan")
-
-    date = mapped_column(DateTime)
-    gender: Mapped[str] = mapped_column(String(6))
-    expectedvalue: Mapped[float] = mapped_column(Float)
-    currentlosestreak: Mapped[int] = mapped_column(Integer)
-    currentwinstreak: Mapped[int] = mapped_column(Integer)
-    draws: Mapped[int] = mapped_column(Integer)
-    avgsigstrlanded: Mapped[float] = mapped_column(Float)
-    avgsigstrpct: Mapped[float] = mapped_column(Float)
-    avgsubatt: Mapped[float] = mapped_column(Float)
-    avgtdlanded: Mapped[float] = mapped_column(Float)
-    avgtdpct: Mapped[float] = mapped_column(Float)
-    losses: Mapped[int] = mapped_column(Integer)
-    totalroundsfought: Mapped[int] = mapped_column(Integer)
-    totaltitlebouts: Mapped[int] = mapped_column(Integer)
-    winsbysubmission: Mapped[int] = mapped_column(Integer)
-    wins: Mapped[int] = mapped_column(Integer)
-    stance: Mapped[str] = mapped_column(String(10), nullable=True)
-    heightcms: Mapped[float] = mapped_column(Float)
-    reachcms: Mapped[float] = mapped_column(Float)
-    weightlbs: Mapped[int] = mapped_column(Integer)
-    age: Mapped[int] = mapped_column(Integer)
-    winsbydecision: Mapped[int] = mapped_column(Integer)
-    winsbykotko: Mapped[int] = mapped_column(Integer)
-    ufc_debut: Mapped[int] = mapped_column(Integer)
-    dayssincelastfight: Mapped[int] = mapped_column(Integer)
-    currelo: Mapped[float] = mapped_column(Float)
-
-    def __repr__(self) -> str:
-        return f"<Fighter(id={self.id}, name='{self.fighter}')"
-    
-class WeightClass(Base):
-    __tablename__ = "weight_classes"
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    
-    # Establish Foreign Key to link to Fighter table
-    fighter_id: Mapped[int] = mapped_column(ForeignKey('fighters.id'), nullable=False)
-    # Back reference to the fighter (create relationship)
-    fighter: Mapped["Fighter"] = relationship("Fighter", back_populates="weight_classes")
-    
-    weightclass: Mapped[str] = mapped_column(String(30), nullable=False)
-
-    def __repr__(self):
-        return f"<WeightClass(id={self.id}, fighter_id={self.fighter_id}, weight_class='{self.weight_class}')>"
 
 def split_fights(df: pd.DataFrame) -> pd.DataFrame:
     '''
@@ -90,69 +34,45 @@ def split_fights(df: pd.DataFrame) -> pd.DataFrame:
     bfighter = df[shared + blue].rename(columns=renameTo)
     return pd.concat([rfighter, bfighter]).reset_index(drop=True)
 
-def populate_db_bulk(stats_dict, wc_dict, engine):
+def populate_db_bulk(stats_dict, wc_dict, session: Session):
     """
     Efficient bulk insertion method for UFC dataset
     """
-    Session = sessionmaker(bind=engine)
+    session = SessionLocal()
     
-    with Session() as session:
-        fighter_data = []
+    # Collect all fighter data and perform bulk insertion
+    fighter_data = []
+    for stats in stats_dict.values():
+        fighter_data.append(stats)
 
-        for stats in stats_dict.values():
-            fighter_data.append(stats)
+    crud.bulk_insert_fighters(session, fighter_data)
         
-        # Bulk insert the fighter data
-        session.execute(insert(Fighter), fighter_data)
-        session.flush()
-        
-        # Query back the fighters to get their IDs for weight class insertion
-        weight_class_data = []
-        for fighter_name, weight_classes in wc_dict.items():
-            # Find the fighter in the database to get their ID
-            fighter = session.query(Fighter).filter(Fighter.fighter == fighter_name).first()
-            if not fighter:
-                continue
+    # Query the fighters to get their IDs and build weight class rows
+    weight_class_data = []
+    for fighter_name, weight_classes in wc_dict.items():
+        # Find the fighter in the database to get their ID
+        fighter = crud.get_fighter_stats(session, fighter_name)
+        if not fighter:
+            continue
 
-            for wc in weight_classes:
-                weight_class_data.append({
-                    'fighter_id': fighter.id,
-                    'weightclass': wc
-                })
-        
-        # Bulk insert weight classes
-        if weight_class_data:
-            session.execute(insert(WeightClass), weight_class_data)
-        
-        session.commit()
-        print(f"Bulk inserted {len(fighter_data)} fighters and {len(weight_class_data)} weight class records")
-        
-
-def get_fighter_weight_classes(session, fighter_name):
-    """
-    Query: Get all weight classes a fighter has fought at
-    """
-    fighter = session.query(Fighter).filter(Fighter.fighter_name == fighter_name).first()
-    if fighter:
-        weight_classes = [wc.weight_class for wc in fighter.weight_classes]
-        return weight_classes
-    return []
-
-def get_fighters_by_weight_class(session, weight_class_name):
-    """
-    Query: Get all fighters who fought at a specific weight class
-    """
-    # Method 1: Query WeightClass and access fighters through relationship
-    weight_class_records = session.query(WeightClass).filter(
-        WeightClass.weight_class == weight_class_name
-    ).all()
-    fighters = [wc.fighter for wc in weight_class_records]
+        for wc in weight_classes:
+            weight_class_data.append({
+                'fighter_id': fighter.id,
+                'weightclass': wc
+            })
     
-    return fighters
+    # Bulk insert weight classes
+    crud.bulk_insert_weightclass(session, weight_class_data)
+    
+    session.commit()
+    print(f"Bulk inserted {len(fighter_data)} fighters and {len(weight_class_data)} weight class records")
 
 def main():
+    SCRIPT_DIR = Path(__file__).resolve().parent
+    DATASET_PATH = SCRIPT_DIR.parent / "datasets" / "ufc-clean.csv"
+
     # Read cleaned data and split stats by fighter
-    df = pd.read_csv('../datasets/ufc-clean.csv')
+    df = pd.read_csv(DATASET_PATH)
     df = split_fights(df)
 
     # Convert date column to datetime
@@ -181,14 +101,14 @@ def main():
                 latest_fights[name] = row.to_dict()
 
     wc_dict = {fighter : list(classes) for fighter, classes in wc_unique.items()}
-    
-    # Initiate session and create schema
-    DATABASE_URL = 'sqlite:///../ufc.db'
-    engine = create_engine(DATABASE_URL)
+
+    # Drop and recreate existing schema, instantiate session
+    Base.metadata.drop_all(bind=engine) 
     Base.metadata.create_all(engine)
+    session = SessionLocal()
 
     # Populate Database
-    populate_db_bulk(latest_fights, wc_dict, engine)
+    populate_db_bulk(latest_fights, wc_dict, session)
 
 if __name__ == "__main__":
     main()
