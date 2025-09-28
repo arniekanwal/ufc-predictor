@@ -1,7 +1,16 @@
 [build-system]
 requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "libsql"
-version = "0.1.0"
-dependencies = ["sqlalchemy"]
+name = "ufc-libs"
+version = "1.0.0"
+description = "Shared libraries for UFC-Predictor"
+dependencies = [
+    "sqlalchemy",
+    "numpy",
+    "xgboost"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
