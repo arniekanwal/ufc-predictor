@@ -14,18 +14,20 @@ python3 -m venv <env_name>
 source <env_name>/bin/activate
 pip freeze > requirements.txt
 pip install -r requirements.txt
+pip install -e lib
 ```
 
 ## Project Structure
 ```
-project-root/                                                       
-├── app/        → web app code     
+project-root/    
+├── models/     → save models to disk here                                               
 ├── datasets/   → csv                        
-├── docs/       → documentation and project notes        
-├── lib/        → custom libraries used across entire repo
-├── model/      → ML model API (serves XGB and PyTorch models) 
+├── docs/            
 ├── notebooks/  → Jupyter notebooks for exploration & prototyping   
-├── scripts/    → helper scripts for automation 
+├── scripts/    → automation tasks
+├── lib/        
+|   ├── libsql/     → define UFC DB and SQL queries
+|   ├── ufcpredict/ → load and query ML models
 └── README.md   → project overview                                  
 ```
 

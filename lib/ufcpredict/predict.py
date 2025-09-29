@@ -92,12 +92,17 @@ class UFCPredictor:
         ]).reshape(1, -1) # Reshape into (1, 24) column vec
 
         pred = self.xgb_model.predict(vec)
-        prob = self.xgb_model.predict_proba(vec)
-        print("Prediction Result:")
-        print(f"Red: {r.fighter}, Blue: {b.fighter}")
-        print(pred) # 0: Blue winner, 1: Red winner
-        print(prob) # [blue_prob, red_prob]
-        return pred, prob
+        prob = self.xgb_model.predict_proba(vec).tolist()
+        r_p, b_p = prob[0][1], prob[0][0]
+
+        result = {
+            "winner": r.fighter if (pred[0] == 1) else b.fighter,
+            "rprob": round(r_p, 4),
+            "bprob": round(b_p, 4),
+            "rcorner": r.fighter,
+            "bcorner": b.fighter
+        }
+        return result
         
     # ---------------------------------
     # PyTorch specific methods...
