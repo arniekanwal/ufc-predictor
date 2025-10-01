@@ -5,7 +5,7 @@ WORKDIR /app
 RUN mkdir -p /app/lib
 COPY lib/ /app/lib/
 
-COPY requirements.txt .
+COPY /app/requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -e /app/lib
