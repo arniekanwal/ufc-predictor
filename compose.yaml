@@ -13,11 +13,12 @@ services:
       context: .            # build context of THIS project
       dockerfile: app/Dockerfile
     container_name: ufc-flask
-    
+    env_file:
+      - .env.dev
     # NOTE: must use "./" to specify bind mount (local folder)
     volumes:                  
       - ./app:/app            # live code reload
-      - ./lib:/app/lib            # mount your shared libraries
+      - ./lib:/app/lib        # mount your shared libraries
       - ./ufc.db:/data/ufc.db # SQLite file
     ports:
       - "8000:8000"
@@ -29,9 +30,13 @@ services:
       context: .            # build context of THIS project
       dockerfile: ml-api/Dockerfile
     container_name: ml-api
+    env_file:
+      - .env.dev
+    # NOTE: these volumes will overwrite everything COPY'd by image
     volumes:
       - ./ml-api:/app         # live code reload
       - ./lib:/app/lib        # mount your shared libraries
+      - ./models:/app/models  # mount ML model
       - ./ufc.db:/data/ufc.db # SQLite file
     ports:
       - "4000:4000"
