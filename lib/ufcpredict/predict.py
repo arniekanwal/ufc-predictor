@@ -1,12 +1,13 @@
 import numpy as np
 import xgboost as xgb
 from pathlib import Path
+import os
 
 from libsql.db import SessionLocal
 from libsql import crud
 
 class UFCPredictor:
-    def __init__(self, xgb_model_file: str, pytorch_model_file: str = None, pytorch_model_class=None):
+    def __init__(self, xgb_model_file: str = None, pytorch_model_file: str = None, pytorch_model_class=None):
         """
         Initialize the UFC predictor with multiple models
         
@@ -15,17 +16,37 @@ class UFCPredictor:
             pytorch_model_path: PyTorch model filename
             pytorch_model_class: PyTorch model class (if loading state dict)
         """
-        
-        self.ROOT       = self._find_project_root()
-        self.XGB_PATH   = self.ROOT / "models" / xgb_model_file
-        # self.TORCH_PATH = self.ROOT / "models" / pytorch_model_file
+
+        # Resolve models directory
+        default_models_dir = Path(__file__).resolve().parents[2] / "models"
+        self.models_dir = Path(os.getenv("MODELS_DIR", default_models_dir))
+
+        # --- XGBoost model ---
+        # First, get the model name (either user supplied or use default)
+        if not xgb_model_file:
+            xgb_model_file = "ufc_xgb_model.ubj"
+
+        self.XGB_PATH = self.models_dir / xgb_model_file
+        if not self.XGB_PATH.exists():
+            raise FileNotFoundError(f"XGBoost model not found at {self.XGB_PATH}")
 
         self.xgb_model = xgb.XGBClassifier()
         self.xgb_model.load_model(self.XGB_PATH)
 
+        # --- PyTorch model ---
         self.pytorch_model = None
         self.pytorch_model_class = pytorch_model_class
+        # if pytorch_model_file and pytorch_model_class:
+        #     torch_path = self.models_dir / pytorch_model_file
+        #     if not torch_path.exists():
+        #         raise FileNotFoundError(f"PyTorch model not found at {torch_path}")
 
+        #     self.pytorch_model = pytorch_model_class()
+        #     state_dict = torch.load(torch_path, map_location=torch.device("cpu"))
+        #     self.pytorch_model.load_state_dict(state_dict)
+        #     self.pytorch_model.eval()
+        
+        # --- DB Session ---
         self.sesh = SessionLocal()
 
     def _find_project_root(self):

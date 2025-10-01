@@ -10,7 +10,7 @@ ml_models = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize your predictor (adjust model path as needed)
-    ml_models["xgb"] = UFCPredictor("ufc_xgb_model.ubj")    
+    ml_models["xgb"] = UFCPredictor()    
     yield
     # Clean up the ML models and release the resources
     ml_models.clear()
@@ -34,6 +34,7 @@ class HealthCheck(BaseModel):
 class Prediction(BaseModel):
     fighter1: str
     fighter2: str
+    autoselect_corner: bool = False
 
 # ---------------------------
 # API Endpoints
