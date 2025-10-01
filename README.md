@@ -17,6 +17,16 @@ pip install -r requirements.txt
 pip install -e lib
 ```
 
+## Useful Docker Commands
+
+```bash
+docker compose --env-file .env.dev up --build --detach
+docker compose down
+docker ps
+docker stop <container_id>
+docker rm <container_id>
+```
+
 ## Project Structure
 ```
 project-root/    

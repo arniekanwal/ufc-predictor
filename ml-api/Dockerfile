@@ -1,33 +1,22 @@
 # fast-api/Dockerfile
-FROM python:3.11-slim
+FROM python:3.11
 
-# Set working directory
 WORKDIR /app
 
-# Copy library code first (for better caching)
+# Copy shared libraries
+RUN mkdir -p /app/lib
 COPY lib/ /app/lib/
 
-# Copy FastAPI requirements
-COPY ../requirements.txt .
+COPY requirements.txt .
 
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -e /app/lib
 
-# Copy FastAPI application code
 COPY ml-api/ .
 
-# Create directory for models if needed
+# Create folder for models and copy existing models
 RUN mkdir -p /app/models
-
-# Copy model files (if stored in repo)
 COPY models/ /app/models/
 
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=60s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
-
-# Run
-CMD ["fastapi", "dev", "main.py"]
+EXPOSE 4000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "4000", "--reload"]

@@ -8,32 +8,33 @@
 # database or a cache. For examples, see the Awesome Compose repository:
 # https://github.com/docker/awesome-compose
 services:
-  fastapi:
+  ufc-flask:
     build:
-      context: .
-      dockerfile: ml-api/Dockerfile
-    command: fastapi dev main.py
-    volumes:
-      # Mount source code for hot reload
-      - ./ml-api:/app:delegated
-      - ./lib:/app/lib:delegated
-    environment:
-      - FLASK_ENV=development
-      - LOG_LEVEL=DEBUG
-
-  flask:
-    build:
-      context: .
+      context: .            # build context of THIS project
       dockerfile: app/Dockerfile
-    command: flask run app.py  # Use Flask's built-in server for dev
+    container_name: ufc-flask
+    
+    # NOTE: must use "./" to specify bind mount (local folder)
+    volumes:                  
+      - ./app:/app            # live code reload
+      - ./lib:/app/lib            # mount your shared libraries
+      - ./ufc.db:/data/ufc.db # SQLite file
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ml-api
+
+  ml-api:
+    build:
+      context: .            # build context of THIS project
+      dockerfile: ml-api/Dockerfile
+    container_name: ml-api
     volumes:
-      # Mount source code for hot reload
-      - ./app:/app:delegated
-      - ./lib:/app/lib:delegated
-    environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
-      - LOG_LEVEL=DEBUG
+      - ./ml-api:/app         # live code reload
+      - ./lib:/app/lib        # mount your shared libraries
+      - ./ufc.db:/data/ufc.db # SQLite file
+    ports:
+      - "4000:4000"
 
 # The commented out section below is an example of how to define a PostgreSQL
 # database that your application can use. `depends_on` tells Docker Compose to
