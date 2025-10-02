@@ -200,7 +200,17 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
         const resultDiv = document.getElementById('result');
         
         if (response.ok) {
-            resultDiv.innerHTML = `<p style="color: green;">${result.message}</p>`;
+            //         result = {
+            // "winner": r.fighter if (pred[0] == 1) else b.fighter,
+            // "rprob": round(r_p, 4),
+            // "bprob": round(b_p, 4),
+            // "rcorner": r.fighter,
+            // "bcorner": b.fighter
+            resultDiv.innerHTML = `
+                <p>Red Corner: ${result.rcorner}, Blue Corner: ${result.bcorner}</p>
+                <p>Probabilities: [${result.rprob}, ${result.bprob}]</p>
+                <p>Winner: ${result.winner}</p>
+            `;
         } else {
             resultDiv.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
         }

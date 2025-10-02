@@ -3,23 +3,12 @@
 <head>
     <title>UFC Fighter Prediction</title>
     <style>
-        /* Hide all WebKit autofill buttons */
-        input::-webkit-contacts-auto-fill-button,
-        input::-webkit-credentials-auto-fill-button,
-        input::-webkit-strong-password-auto-fill-button {
+        input::-webkit-contacts-auto-fill-button {
+            visibility: hidden;
             display: none !important;
-            visibility: hidden !important;
-            pointer-events: none !important;
-            position: absolute !important;
-            right: -9999px !important;
-        }
-        
-        /* Disable autofill background colors */
-        input:-webkit-autofill,
-        input:-webkit-autofill:hover,
-        input:-webkit-autofill:focus {
-            -webkit-box-shadow: 0 0 0 1000px white inset !important;
-            -webkit-text-fill-color: black !important;
+            pointer-events: none;
+            position: absolute;
+            right: 0;
         }
     </style>
 </head>
@@ -29,17 +18,19 @@
     <div>
         <h3>Fighter 1</h3>
         <div class="autocomplete-container">
-            <input type="text" 
+        <div class="autocomplete-container">
+            <input 
+                type="text" 
                 id="fighter1-input" 
-                name="fighter-search-xyz123-disable"
-                autocomplete="nope"
-                autocapitalize="none"
+                placeholder="Type fighter name..."
+                autocomplete="off"
+                autocapitalize="off"
                 autocorrect="off"
-                spellcheck="false"
-                placeholder="Type fighter name...">
+                spellcheck="off">
             <ul id="fighter1-suggestions" style="display: none;"></ul>
             <div id="fighter1-error" style="display: none; color: red;"></div>
             <div id="fighter1-selected" style="display: none;">Selected: <span></span></div>
+        </div>
         </div>
     </div>
     

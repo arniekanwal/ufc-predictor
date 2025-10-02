@@ -66,6 +66,6 @@ def predict(matchup: Prediction):
 
 '''
 Examples:
-curl -X POST 127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"fighter1": "Tom Aspinall", "fighter2": "Jon Jones"}'
+curl -X POST 127.0.0.1:4000/predict -H "Content-Type: application/json" -d '{"fighter1": "Tom Aspinall", "fighter2": "Jon Jones"}'
 '''
 
